@@ -3,7 +3,7 @@ import logging
 from datetime import date, datetime, timedelta
 
 import sqlalchemy as sa
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
@@ -237,7 +237,7 @@ def settings_page(request: Request):
 
 
 @router.post("/settings/telegram")
-def save_telegram_settings(request: Request, bot_token: str = "", chat_id: str = ""):
+def save_telegram_settings(bot_token: str = Form(""), chat_id: str = Form("")):
     """Save Telegram settings to DB."""
     set_setting("telegram_bot_token", bot_token)
     set_setting("telegram_chat_id", chat_id)
@@ -245,7 +245,7 @@ def save_telegram_settings(request: Request, bot_token: str = "", chat_id: str =
 
 
 @router.post("/settings/threshold")
-def save_threshold(symbol: str, min_rate: float):
+def save_threshold(symbol: str = Form(...), min_rate: float = Form(...)):
     """Save or update rate threshold for a symbol."""
     existing = fetch_one(
         sa.select(alert_thresholds).where(alert_thresholds.c.symbol == symbol)
@@ -262,13 +262,13 @@ def save_threshold(symbol: str, min_rate: float):
 
 
 @router.post("/settings/threshold/delete")
-def delete_threshold(symbol: str):
+def delete_threshold(symbol: str = Form(...)):
     execute(alert_thresholds.delete().where(alert_thresholds.c.symbol == symbol))
     return {"status": "ok"}
 
 
 @router.post("/analytics/refund/received")
-def mark_refund_received(quarter: str, amount: float):
+def mark_refund_received(quarter: str = Form(...), amount: float = Form(...)):
     """Mark partial or full refund as received."""
     refund = fetch_one(
         sa.select(brokerage_refunds).where(brokerage_refunds.c.quarter == quarter)

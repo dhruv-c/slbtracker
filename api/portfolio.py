@@ -2,7 +2,7 @@
 import logging
 
 import sqlalchemy as sa
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
@@ -27,7 +27,7 @@ def portfolio_page(request: Request):
 
 
 @router.post("/add")
-def add_stock(symbol: str, client_name: str = "Family Office", quantity: int = 0):
+def add_stock(symbol: str = Form(...), client_name: str = Form("Family Office"), quantity: int = Form(0)):
     """Add a stock to the portfolio."""
     symbol = symbol.strip().upper()
     if not symbol:
@@ -56,7 +56,7 @@ def add_stock(symbol: str, client_name: str = "Family Office", quantity: int = 0
 
 
 @router.post("/update")
-def update_stock(symbol: str, client_name: str = None, quantity: int = None):
+def update_stock(symbol: str = Form(...), client_name: str = Form(None), quantity: int = Form(None)):
     """Update stock details."""
     updates = {}
     if client_name is not None:
@@ -76,7 +76,7 @@ def update_stock(symbol: str, client_name: str = None, quantity: int = None):
 
 
 @router.post("/deactivate")
-def deactivate_stock(symbol: str):
+def deactivate_stock(symbol: str = Form(...)):
     """Deactivate a stock (soft delete)."""
     execute(
         portfolio.update()
@@ -87,7 +87,7 @@ def deactivate_stock(symbol: str):
 
 
 @router.post("/activate")
-def activate_stock(symbol: str):
+def activate_stock(symbol: str = Form(...)):
     """Reactivate a stock."""
     execute(
         portfolio.update()
@@ -98,7 +98,7 @@ def activate_stock(symbol: str):
 
 
 @router.delete("/delete")
-def delete_stock(symbol: str):
+def delete_stock(symbol: str = Form(...)):
     """Permanently delete a stock."""
     execute(portfolio.delete().where(portfolio.c.symbol == symbol.upper()))
     return {"status": "ok"}
