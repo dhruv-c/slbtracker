@@ -118,19 +118,19 @@
 
 <!-- Lending Advisor -->
 <div class="card">
-    <div class="card-title">Lending Advisor — Series {{ current_series }} vs {{ next_series }}</div>
+    <div class="card-title">Lending Advisor — {{ current_label }} vs {{ next_label }}</div>
     {% if advisor_data %}
     <div class="table-wrap">
         <table>
             <thead>
                 <tr>
                     <th>Symbol</th>
-                    <th class="text-right">Current Yield %</th>
-                    <th class="text-right">Current Bid Qty</th>
+                    <th class="text-right">{{ current_label }} Yield %</th>
+                    <th class="text-right">{{ current_label }} Qty</th>
                     <th class="text-right">Days Left</th>
                     <th class="text-right">Net Yield %</th>
-                    <th class="text-right">Next Yield %</th>
-                    <th class="text-right">Next Bid Qty</th>
+                    <th class="text-right">{{ next_label }} Yield %</th>
+                    <th class="text-right">{{ next_label }} Qty</th>
                     <th class="text-right">Days Left</th>
                     <th class="text-right">Net Yield %</th>
                     <th>Recommendation</th>

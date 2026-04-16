@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% set active_page = "live_slb" %}
+
+{% block title %}Live SLB — SLBM Tracker{% endblock %}
+
+{% block content %}
+<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+    <h1 class="page-title" style="margin-bottom: 0;">Live SLB Market Watch</h1>
+    <div style="display: flex; align-items: center; gap: 0.75rem;">
+        {% if last_updated %}
+        <span class="text-dim" id="last-updated">Last updated: {{ last_updated.strftime('%d %b %H:%M:%S') if last_updated else 'Never' }}</span>
+        {% endif %}
+        <button class="btn btn-primary" onclick="pollNow()" id="poll-btn">Check Now</button>
+    </div>
+</div>
+
+<!-- Series selector -->
+<div class="card" style="padding: 0.75rem 1rem; margin-bottom: 1rem;">
+    <div style="display: flex; align-items: center; gap: 1rem;">
+        <span>Series:</span>
+        <a href="/live-slb?series={{ current_series }}"
+           class="btn btn-sm {{ 'btn-primary' if selected_series == current_series else 'btn-ghost' }}">
+            {{ current_label }}
+        </a>
+        <a href="/live-slb?series={{ next_series }}"
+           class="btn btn-sm {{ 'btn-primary' if selected_series == next_series else 'btn-ghost' }}">
+            {{ next_label }}
+        </a>
+        <span class="text-dim" style="margin-left: auto;">{{ total_count }} symbols</span>
+    </div>
+</div>
+
+<!-- Market Watch Table -->
+<div class="card">
+    <div class="card-title">{{ selected_label }} — All Symbols</div>
+    <div class="table-wrap">
+        <table id="slb-table">
+            <thead>
+                <tr>
+                    <th>Symbol</th>
+                    <th class="text-right">Bid Qty</th>
+                    <th class="text-right">Bid Price</th>
+                    <th class="text-right">Offer Price</th>
+                    <th class="text-right">Offer Qty</th>
+                    <th class="text-right">LTP</th>
+                    <th class="text-right">Yield % p.a.</th>
+                    <th class="text-right">Spread %</th>
+                    <th class="text-right">Underlying</th>
+                    <th class="text-right">Open Pos</th>
+                    <th class="text-right">Volume</th>
+                    <th>Recall</th>
+                    <th>Repay</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr class="{{ 'row-highlight' if row.symbol in portfolio_symbols else '' }}">
+                    <td>
+                        <strong>{{ row.symbol }}</strong>
+                        {% if row.symbol in portfolio_symbols %}<span class="badge badge-blue" style="font-size:0.65rem;">TRACKED</span>{% endif %}
+                    </td>
+                    <td class="text-right {{ 'text-green' if row.best_bid_qty else '' }}">
+                        {% if row.best_bid_qty %}{{ "{:,}".format(row.best_bid_qty) }}{% else %}-{% endif %}
+                    </td>
+                    <td class="text-right">
+                        {% if row.best_bid_price %}{{ "%.2f"|format(row.best_bid_price) }}{% else %}-{% endif %}
+                    </td>
+                    <td class="text-right">
+                        {% if row.best_offer_price %}{{ "%.2f"|format(row.best_offer_price) }}{% else %}-{% endif %}
+                    </td>
+                    <td class="text-right">
+                        {% if row.best_offer_qty %}{{ "{:,}".format(row.best_offer_qty) }}{% else %}-{% endif %}
+                    </td>
+                    <td class="text-right">
+                        {% if row.ltp %}{{ "%.2f"|format(row.ltp) }}{% else %}-{% endif %}
+                    </td>
+                    <td class="text-right {{ 'text-green' if row.annualised_yield_pct and row.annualised_yield_pct > 0 else '' }}">
+                        {% if row.annualised_yield_pct %}{{ "%.2f"|format(row.annualised_yield_pct) }}%{% else %}-{% endif %}
+                    </td>
+                    <td class="text-right">
+                        {% if row.spread_pct is not none %}{{ "%.2f"|format(row.spread_pct) }}%{% else %}-{% endif %}
+                    </td>
+                    <td class="text-right">
+                        {% if row.underlying_ltp %}{{ "₹{:,.2f}".format(row.underlying_ltp) }}{% else %}-{% endif %}
+                    </td>
+                    <td class="text-right">
+                        {% if row.open_positions %}{{ "{:,}".format(row.open_positions) }}{% else %}-{% endif %}
+                    </td>
+                    <td class="text-right">
+                        {% if row.volume %}{{ "{:,}".format(row.volume) }}{% else %}-{% endif %}
+                    </td>
+                    <td>
+                        {% if row.allow_recall == 0 %}
+                        <span class="badge badge-red" title="No recall allowed">No</span>
+                        {% elif row.allow_recall == 1 %}
+                        <span class="badge badge-green">Yes</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>
+                        {% if row.allow_repay == 0 %}
+                        <span class="badge badge-red" title="No repay allowed">No</span>
+                        {% elif row.allow_repay == 1 %}
+                        <span class="badge badge-green">Yes</span>
+                        {% else %}-{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if not rows %}
+                <tr><td colspan="13" class="text-dim" style="text-align:center; padding:2rem;">No SLB data yet. Click "Check Now" to fetch latest rates, or wait for the next scheduled poll.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function pollNow() {
+        const btn = document.getElementById('poll-btn');
+        btn.disabled = true;
+        btn.textContent = 'Polling...';
+        try {
+            const resp = await fetch('/poll-now', { method: 'POST' });
+            const data = await resp.json();
+            if (data.status === 'ok') {
+                showToast('SLB rates updated!');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast('Poll failed: ' + (data.message || 'Unknown error'));
+                btn.disabled = false;
+                btn.textContent = 'Check Now';
+            }
+        } catch (e) {
+            showToast('Request failed');
+            btn.disabled = false;
+            btn.textContent = 'Check Now';
+        }
+    }
+
+    // Auto-refresh every 60 seconds
+    setTimeout(() => location.reload(), 60000);
+</script>
+{% endblock %}

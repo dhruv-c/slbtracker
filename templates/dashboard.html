@@ -4,7 +4,10 @@
 {% block title %}Dashboard — SLBM Tracker{% endblock %}
 
 {% block content %}
-<h1 class="page-title">Dashboard</h1>
+<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+    <h1 class="page-title" style="margin-bottom: 0;">Dashboard</h1>
+    <button class="btn btn-primary" onclick="pollNow()" id="poll-btn">Check SLB Now</button>
+</div>
 
 <!-- Quick Stats -->
 <div class="stats-grid">
@@ -29,7 +32,7 @@
 <div class="grid-2">
     <!-- Active Bids -->
     <div class="card">
-        <div class="card-title">Active SLB Bids (Series {{ current_series }} &amp; {{ next_series }})</div>
+        <div class="card-title">Active SLB Bids — {{ current_label }} &amp; {{ next_label }}</div>
         {% if active_bids %}
         <div class="table-wrap">
             <table>
@@ -47,7 +50,7 @@
                     <tr>
                         <td><strong>{{ bid.symbol }}</strong></td>
                         <td>
-                            <span class="badge badge-blue">{{ bid.series }}</span>
+                            <span class="badge badge-blue">{{ bid.series_label }}</span>
                             <span class="text-dim">({{ bid.series_type }})</span>
                         </td>
                         <td class="text-right text-green">{% if bid.yield_pct %}{{ "%.2f"|format(bid.yield_pct) }}%{% else %}-{% endif %}</td>
@@ -83,8 +86,8 @@
                 {{ item.recommendation|upper }} MONTH
             </span>
             <div style="font-size: 0.85rem; margin-top: 0.3rem;">
-                Series {{ current_series }}: {{ "%.2f"|format(item.current_yield_pct or 0) }}% x {{ item.current_days }}d = {{ "%.3f"|format(item.current_net_yield_pct) }}% net<br>
-                Series {{ next_series }}: {{ "%.2f"|format(item.next_yield_pct or 0) }}% x {{ item.next_days }}d = {{ "%.3f"|format(item.next_net_yield_pct) }}% net<br>
+                {{ current_label }}: {{ "%.2f"|format(item.current_yield_pct or 0) }}% x {{ item.current_days }}d = {{ "%.3f"|format(item.current_net_yield_pct) }}% net<br>
+                {{ next_label }}: {{ "%.2f"|format(item.next_yield_pct or 0) }}% x {{ item.next_days }}d = {{ "%.3f"|format(item.next_net_yield_pct) }}% net<br>
                 <span class="text-dim">Difference: {{ "%.1f"|format(item.difference_bps) }} bps</span>
             </div>
         </div>
@@ -119,6 +122,28 @@
 
 {% block scripts %}
 <script>
+    async function pollNow() {
+        const btn = document.getElementById('poll-btn');
+        btn.disabled = true;
+        btn.textContent = 'Polling...';
+        try {
+            const resp = await fetch('/poll-now', { method: 'POST' });
+            const data = await resp.json();
+            if (data.status === 'ok') {
+                showToast('SLB rates updated!');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast('Poll failed: ' + (data.message || 'Unknown error'));
+                btn.disabled = false;
+                btn.textContent = 'Check SLB Now';
+            }
+        } catch (e) {
+            showToast('Request failed');
+            btn.disabled = false;
+            btn.textContent = 'Check SLB Now';
+        }
+    }
+
     // Auto-refresh every 60 seconds
     setTimeout(() => location.reload(), 60000);
 </script>

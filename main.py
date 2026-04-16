@@ -149,3 +149,15 @@ def health():
         "scheduler_running": scheduler.running,
         "jobs": [j.name for j in scheduler.get_jobs()],
     }
+
+
+@app.post("/poll-now")
+def poll_now():
+    """Manually trigger SLB rate poll."""
+    from jobs.slb_poller import poll_slb_rates
+    try:
+        poll_slb_rates()
+        return {"status": "ok", "message": "Poll completed"}
+    except Exception as e:
+        logger.error(f"Manual poll failed: {e}")
+        return {"status": "error", "message": str(e)}

@@ -46,11 +46,24 @@ class Settings(BaseSettings):
         nxt = self.X_SERIES_MAP[next_month]
         return current, nxt
 
+    MONTH_NAMES: ClassVar[dict[int, str]] = {
+        1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun",
+        7: "Jul", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dec",
+    }
+
     @staticmethod
     def series_to_month(series: str) -> int:
         """Convert X-series code back to month number (e.g. 'X5' → 5, 'XA' → 10)."""
         reverse = {v: k for k, v in Settings.X_SERIES_MAP.items()}
         return reverse.get(series.upper(), 0)
+
+    @staticmethod
+    def series_label(series: str) -> str:
+        """Return display label like 'X4 (Apr)' for use in UI."""
+        month_num = Settings.series_to_month(series)
+        if month_num:
+            return f"{series} ({Settings.MONTH_NAMES[month_num]})"
+        return series
 
 
 settings = Settings()

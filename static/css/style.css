@@ -353,3 +353,15 @@ input:focus, select:focus {
 }
 
 .toast.show { display: block; }
+
+/* Live SLB — highlight portfolio rows */
+.row-highlight { background: rgba(99, 102, 241, 0.08); }
+.row-highlight:hover { background: rgba(99, 102, 241, 0.14); }
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Text decoration for links used as buttons */
+a.btn { text-decoration: none; }

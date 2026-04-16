@@ -51,6 +51,7 @@ def dashboard(request: Request):
                 active_bids.append({
                     "symbol": sym,
                     "series": series,
+                    "series_label": settings.series_label(series),
                     "series_type": "current" if series == current_series else "next",
                     "yield_pct": snap.annualised_yield_pct,
                     "bid_price": snap.best_bid_price,
@@ -123,6 +124,8 @@ def dashboard(request: Request):
         "alerts": alerts,
         "current_series": current_series,
         "next_series": next_series,
+        "current_label": settings.series_label(current_series),
+        "next_label": settings.series_label(next_series),
         "stats": {
             "open_positions": open_positions[0] if open_positions else 0,
             "today_income": today_income[0] if today_income else 0,
@@ -213,6 +216,8 @@ def analytics(request: Request):
         "advisor_data": advisor_data,
         "current_series": current_series,
         "next_series": next_series,
+        "current_label": settings.series_label(current_series),
+        "next_label": settings.series_label(next_series),
     })
 
 
@@ -288,6 +293,51 @@ def mark_refund_received(quarter: str = Form(...), amount: float = Form(...)):
         )
     )
     return {"status": "ok", "new_received": new_received, "new_status": new_status}
+
+
+@router.get("/live-slb", response_class=HTMLResponse)
+def live_slb(request: Request, series: str = ""):
+    """Live SLB market watch — latest snapshot for all symbols."""
+    current_series, next_series = settings.get_active_series()
+    selected_series = series.upper() if series else current_series
+
+    # Get the most recent snapshot time for this series
+    latest_time = fetch_one(
+        sa.select(sa.func.max(slb_snapshots.c.snapshot_time))
+        .where(slb_snapshots.c.series == selected_series)
+    )
+    last_updated = latest_time[0] if latest_time and latest_time[0] else None
+
+    # Get all rows from the latest snapshot
+    rows = []
+    if last_updated:
+        rows = fetch_all(
+            sa.select(slb_snapshots)
+            .where(slb_snapshots.c.series == selected_series)
+            .where(slb_snapshots.c.snapshot_time == last_updated)
+            .order_by(slb_snapshots.c.annualised_yield_pct.desc().nullslast())
+        )
+
+    # Get portfolio symbols for highlighting
+    portfolio_symbols = {
+        r.symbol for r in fetch_all(
+            sa.select(portfolio.c.symbol).where(portfolio.c.active == 1)
+        )
+    }
+
+    return templates.TemplateResponse("live_slb.html", {
+        "request": request,
+        "rows": rows,
+        "selected_series": selected_series,
+        "selected_label": settings.series_label(selected_series),
+        "current_series": current_series,
+        "next_series": next_series,
+        "current_label": settings.series_label(current_series),
+        "next_label": settings.series_label(next_series),
+        "last_updated": last_updated,
+        "portfolio_symbols": portfolio_symbols,
+        "total_count": len(rows),
+    })
 
 
 # --- Helpers ---
