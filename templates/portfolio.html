@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% set active_page = "portfolio" %}
+
+{% block title %}Portfolio — SLBM Tracker{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Portfolio Management</h1>
+
+<!-- Add Stock Form -->
+<div class="card">
+    <div class="card-title">Add Stock</div>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Symbol</label>
+            <input type="text" id="add-symbol" placeholder="e.g. RELIANCE" style="width: 160px;">
+        </div>
+        <div class="form-group">
+            <label>Client Name</label>
+            <input type="text" id="add-client" value="Family Office" style="width: 200px;">
+        </div>
+        <div class="form-group">
+            <label>Quantity</label>
+            <input type="number" id="add-qty" value="0" style="width: 120px;">
+        </div>
+        <button class="btn btn-primary" onclick="addStock()">Add Stock</button>
+    </div>
+</div>
+
+<!-- Portfolio Table -->
+<div class="card">
+    <div class="card-title">Tracked Stocks</div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Symbol</th>
+                    <th>Client</th>
+                    <th class="text-right">Quantity</th>
+                    <th>Status</th>
+                    <th>Added</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for stock in stocks %}
+                <tr>
+                    <td><strong>{{ stock.symbol }}</strong></td>
+                    <td>{{ stock.client_name }}</td>
+                    <td class="text-right">{{ "{:,}".format(stock.quantity or 0) }}</td>
+                    <td>
+                        {% if stock.active %}
+                        <span class="badge badge-green">ACTIVE</span>
+                        {% else %}
+                        <span class="badge badge-red">INACTIVE</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-dim">{{ stock.added_at.strftime('%d %b %Y') if stock.added_at else '-' }}</td>
+                    <td>
+                        {% if stock.active %}
+                        <button class="btn btn-sm btn-ghost" onclick="deactivate('{{ stock.symbol }}')">Deactivate</button>
+                        {% else %}
+                        <button class="btn btn-sm btn-primary" onclick="activate('{{ stock.symbol }}')">Activate</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if not stocks %}
+                <tr><td colspan="6" class="text-dim" style="text-align:center; padding:2rem;">No stocks in portfolio. Add your first stock above.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function addStock() {
+        const symbol = document.getElementById('add-symbol').value.trim();
+        if (!symbol) { showToast('Enter a symbol'); return; }
+        const client = document.getElementById('add-client').value;
+        const qty = document.getElementById('add-qty').value;
+        const body = `symbol=${encodeURIComponent(symbol)}&client_name=${encodeURIComponent(client)}&quantity=${qty}`;
+        apiCall('/portfolio/add', { body, successMsg: `${symbol} added!` });
+    }
+
+    function deactivate(sym) {
+        apiCall('/portfolio/deactivate', { body: `symbol=${sym}`, successMsg: `${sym} deactivated` });
+    }
+
+    function activate(sym) {
+        apiCall('/portfolio/activate', { body: `symbol=${sym}`, successMsg: `${sym} activated` });
+    }
+
+    document.getElementById('add-symbol').addEventListener('keydown', e => {
+        if (e.key === 'Enter') addStock();
+    });
+</script>
+{% endblock %}

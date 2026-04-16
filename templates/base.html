@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SLBM Tracker{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div class="app">
+        <aside class="sidebar">
+            <div class="sidebar-brand">SLBM Tracker</div>
+            <nav class="sidebar-nav">
+                <a href="/" class="{% if active_page == 'dashboard' %}active{% endif %}">Dashboard</a>
+                <a href="/portfolio" class="{% if active_page == 'portfolio' %}active{% endif %}">Portfolio</a>
+                <a href="/ledger" class="{% if active_page == 'ledger' %}active{% endif %}">Ledger</a>
+                <a href="/analytics" class="{% if active_page == 'analytics' %}active{% endif %}">Analytics</a>
+                <a href="/settings" class="{% if active_page == 'settings' %}active{% endif %}">Settings</a>
+            </nav>
+        </aside>
+        <main class="main">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    <div id="toast" class="toast"></div>
+    <script>
+        function showToast(msg, duration = 3000) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), duration);
+        }
+
+        async function apiCall(url, options = {}) {
+            try {
+                const resp = await fetch(url, {
+                    method: options.method || 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: options.body,
+                    ...options,
+                });
+                const data = await resp.json();
+                if (data.error) {
+                    showToast('Error: ' + data.error);
+                } else {
+                    showToast(options.successMsg || 'Done!');
+                    if (options.reload !== false) {
+                        setTimeout(() => location.reload(), 500);
+                    }
+                }
+                return data;
+            } catch (e) {
+                showToast('Request failed');
+                console.error(e);
+            }
+        }
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

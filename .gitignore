@@ -1,0 +1,10 @@
+data/*.db
+data/*.csv
+data/*.zip
+data/*.pdf
+__pycache__/
+*.pyc
+.env
+*.log
+.venv/
+venv/

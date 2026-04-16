@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% set active_page = "ledger" %}
+
+{% block title %}Ledger — SLBM Tracker{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Transaction Ledger</h1>
+
+<!-- Filters -->
+<div class="filter-bar">
+    <form method="get" action="/ledger" style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:end;">
+        <div class="form-group">
+            <label>Symbol</label>
+            <select name="symbol">
+                <option value="">All</option>
+                {% for s in symbols %}
+                <option value="{{ s }}" {{ 'selected' if filters.symbol == s }}>{{ s }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Quarter</label>
+            <select name="quarter">
+                <option value="">All</option>
+                <option value="Q1-FY27" {{ 'selected' if filters.quarter == 'Q1-FY27' }}>Q1-FY27</option>
+                <option value="Q4-FY26" {{ 'selected' if filters.quarter == 'Q4-FY26' }}>Q4-FY26</option>
+                <option value="Q3-FY26" {{ 'selected' if filters.quarter == 'Q3-FY26' }}>Q3-FY26</option>
+                <option value="Q2-FY26" {{ 'selected' if filters.quarter == 'Q2-FY26' }}>Q2-FY26</option>
+                <option value="Q1-FY26" {{ 'selected' if filters.quarter == 'Q1-FY26' }}>Q1-FY26</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Start Date</label>
+            <input type="date" name="start" value="{{ filters.start }}">
+        </div>
+        <div class="form-group">
+            <label>End Date</label>
+            <input type="date" name="end" value="{{ filters.end }}">
+        </div>
+        <button type="submit" class="btn btn-primary">Filter</button>
+        <a href="/ledger" class="btn btn-ghost">Clear</a>
+        <a href="/reports/export/ledger?symbol={{ filters.symbol }}&start={{ filters.start }}&end={{ filters.end }}" class="btn btn-ghost">Export CSV</a>
+    </form>
+</div>
+
+<!-- Summary -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">Transactions</div>
+        <div class="stat-value">{{ transactions|length }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Gross Income</div>
+        <div class="stat-value">{{ "₹{:,.0f}".format(totals.gross) }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Net Income</div>
+        <div class="stat-value green">{{ "₹{:,.0f}".format(totals.net) }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Refund Due</div>
+        <div class="stat-value yellow">{{ "₹{:,.0f}".format(totals.refund) }}</div>
+    </div>
+</div>
+
+<!-- Transactions Table -->
+<div class="card">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Symbol</th>
+                    <th>Type</th>
+                    <th>Series</th>
+                    <th class="text-right">Qty</th>
+                    <th class="text-right">Rate %</th>
+                    <th class="text-right">Gross</th>
+                    <th class="text-right">STT</th>
+                    <th class="text-right">Brok. Charged</th>
+                    <th class="text-right">Brok. Payable</th>
+                    <th class="text-right">Refund Due</th>
+                    <th class="text-right">Net Income</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in transactions %}
+                <tr class="txn-row" data-raw="{{ t.raw_pdf_text[:200] if t.raw_pdf_text else '' }}">
+                    <td>{{ t.trade_date.strftime('%d %b %Y') if t.trade_date else '-' }}</td>
+                    <td><strong>{{ t.symbol }}</strong></td>
+                    <td>
+                        <span class="badge {{ 'badge-green' if t.transaction_type == 'LEND' else 'badge-red' }}">
+                            {{ t.transaction_type }}
+                        </span>
+                    </td>
+                    <td>{{ t.series }}</td>
+                    <td class="text-right">{{ "{:,}".format(t.quantity) }}</td>
+                    <td class="text-right">{{ "%.2f"|format(t.lending_fee_rate or 0) }}%</td>
+                    <td class="text-right">{{ "₹{:,.0f}".format(t.gross_income or 0) }}</td>
+                    <td class="text-right text-dim">{{ "₹{:,.0f}".format(t.stt or 0) }}</td>
+                    <td class="text-right">{{ "₹{:,.0f}".format(t.gross_brokerage_charged or 0) }}</td>
+                    <td class="text-right">{{ "₹{:,.0f}".format(t.brokerage_payable or 0) }}</td>
+                    <td class="text-right text-yellow">{{ "₹{:,.0f}".format(t.brokerage_refund_due or 0) }}</td>
+                    <td class="text-right text-green">{{ "₹{:,.0f}".format(t.net_income or 0) }}</td>
+                </tr>
+                {% endfor %}
+                {% if not transactions %}
+                <tr><td colspan="12" class="text-dim" style="text-align:center; padding:2rem;">No transactions found. Contract notes will appear here once parsed from email.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

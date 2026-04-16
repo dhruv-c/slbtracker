@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% set active_page = "settings" %}
+
+{% block title %}Settings — SLBM Tracker{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Settings</h1>
+
+<div class="grid-2">
+    <!-- Telegram Config -->
+    <div class="card">
+        <div class="card-title">Telegram Alerts</div>
+        <div class="form-group" style="margin-bottom: 0.75rem;">
+            <label>Bot Token</label>
+            <input type="password" id="tg-token" value="{{ telegram_bot_token }}" style="width: 100%;">
+        </div>
+        <div class="form-group" style="margin-bottom: 0.75rem;">
+            <label>Chat ID</label>
+            <input type="text" id="tg-chat" value="{{ telegram_chat_id }}" style="width: 100%;">
+        </div>
+        <button class="btn btn-primary" onclick="saveTelegram()">Save Telegram Settings</button>
+        <button class="btn btn-ghost" onclick="testTelegram()" style="margin-left: 0.5rem;">Send Test</button>
+    </div>
+
+    <!-- Series Config -->
+    <div class="card">
+        <div class="card-title">Series Configuration</div>
+        <p style="margin-bottom: 0.75rem; font-size: 0.85rem; color: var(--text-dim);">
+            Auto-calculated from today's date. Override in .env if needed.
+        </p>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Current Series</label>
+                <input type="text" value="{{ current_series }}" disabled style="width: 80px;">
+            </div>
+            <div class="form-group">
+                <label>Next Series</label>
+                <input type="text" value="{{ next_series }}" disabled style="width: 80px;">
+            </div>
+            <div class="form-group">
+                <label>Polling Interval</label>
+                <input type="text" value="{{ polling_interval }}s" disabled style="width: 80px;">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Gmail Status -->
+<div class="card">
+    <div class="card-title">Gmail Integration</div>
+    {% if gmail_configured %}
+    <p><span class="badge badge-green">CONNECTED</span> Gmail OAuth token is configured.</p>
+    {% else %}
+    <p><span class="badge badge-red">NOT CONFIGURED</span> Set GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, and GMAIL_REFRESH_TOKEN in .env.</p>
+    <p style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-dim);">See README for step-by-step Gmail OAuth setup instructions.</p>
+    {% endif %}
+</div>
+
+<!-- Alert Thresholds -->
+<div class="card">
+    <div class="card-title">Rate Alert Thresholds</div>
+    <p style="margin-bottom: 0.75rem; font-size: 0.85rem; color: var(--text-dim);">
+        Get a Telegram alert when bid rate crosses these thresholds.
+    </p>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>Symbol</label>
+            <select id="thresh-symbol">
+                {% for s in symbols %}
+                <option value="{{ s }}">{{ s }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Min Rate (%)</label>
+            <input type="number" id="thresh-rate" step="0.1" value="1.0" style="width: 100px;">
+        </div>
+        <button class="btn btn-primary" onclick="addThreshold()">Add Threshold</button>
+    </div>
+
+    {% if thresholds %}
+    <div class="table-wrap" style="margin-top: 0.75rem;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Symbol</th>
+                    <th class="text-right">Min Rate</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in thresholds %}
+                <tr>
+                    <td><strong>{{ t.symbol }}</strong></td>
+                    <td class="text-right">{{ "%.2f"|format(t.min_rate) }}%</td>
+                    <td>
+                        <button class="btn btn-sm btn-danger" onclick="deleteThreshold('{{ t.symbol }}')">Remove</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function saveTelegram() {
+        const token = document.getElementById('tg-token').value;
+        const chatId = document.getElementById('tg-chat').value;
+        apiCall('/settings/telegram', {
+            body: `bot_token=${encodeURIComponent(token)}&chat_id=${encodeURIComponent(chatId)}`,
+            successMsg: 'Telegram settings saved!',
+        });
+    }
+
+    function testTelegram() {
+        saveTelegram();
+        showToast('Saved. Test message will be sent on next alert cycle.');
+    }
+
+    function addThreshold() {
+        const symbol = document.getElementById('thresh-symbol').value;
+        const rate = document.getElementById('thresh-rate').value;
+        apiCall('/settings/threshold', {
+            body: `symbol=${symbol}&min_rate=${rate}`,
+            successMsg: `Threshold set for ${symbol} at ${rate}%`,
+        });
+    }
+
+    function deleteThreshold(sym) {
+        apiCall('/settings/threshold/delete', {
+            body: `symbol=${sym}`,
+            successMsg: `Threshold removed for ${sym}`,
+        });
+    }
+</script>
+{% endblock %}

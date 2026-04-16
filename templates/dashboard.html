@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% set active_page = "dashboard" %}
+
+{% block title %}Dashboard — SLBM Tracker{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Dashboard</h1>
+
+<!-- Quick Stats -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">Active Bids</div>
+        <div class="stat-value">{{ active_bids|length }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Open Positions</div>
+        <div class="stat-value">{{ stats.open_positions }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Today's Income</div>
+        <div class="stat-value green">{{ "₹{:,.0f}".format(stats.today_income) }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Pending Refund</div>
+        <div class="stat-value yellow">{{ "₹{:,.0f}".format(stats.pending_refund) }}</div>
+    </div>
+</div>
+
+<div class="grid-2">
+    <!-- Active Bids -->
+    <div class="card">
+        <div class="card-title">Active SLB Bids (Series {{ current_series }} &amp; {{ next_series }})</div>
+        {% if active_bids %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th>Series</th>
+                        <th class="text-right">Yield % p.a.</th>
+                        <th class="text-right">Bid Qty</th>
+                        <th class="text-right">Underlying</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for bid in active_bids %}
+                    <tr>
+                        <td><strong>{{ bid.symbol }}</strong></td>
+                        <td>
+                            <span class="badge badge-blue">{{ bid.series }}</span>
+                            <span class="text-dim">({{ bid.series_type }})</span>
+                        </td>
+                        <td class="text-right text-green">{% if bid.yield_pct %}{{ "%.2f"|format(bid.yield_pct) }}%{% else %}-{% endif %}</td>
+                        <td class="text-right">{{ "{:,}".format(bid.bid_qty or 0) }}</td>
+                        <td class="text-right">{% if bid.underlying %}{{ "₹{:,.2f}".format(bid.underlying) }}{% else %}-{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-dim">No active bids for portfolio stocks.</p>
+        {% endif %}
+
+        {% if no_bids %}
+        <div style="margin-top: 0.75rem;">
+            <span class="text-dim">No bids:</span>
+            {% for sym in no_bids %}
+            <span class="badge badge-red">{{ sym }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Lending Advisor -->
+    <div class="card">
+        <div class="card-title">Lending Advisor</div>
+        {% if advisor_data %}
+        {% for item in advisor_data %}
+        <div class="{{ 'rec-current' if item.recommendation == 'current' else 'rec-next' }}" style="margin-bottom: 0.75rem; padding: 0.5rem;">
+            <strong>{{ item.symbol }}</strong>
+            <span class="badge {{ 'badge-green' if item.recommendation == 'current' else 'badge-yellow' }}">
+                {{ item.recommendation|upper }} MONTH
+            </span>
+            <div style="font-size: 0.85rem; margin-top: 0.3rem;">
+                Series {{ current_series }}: {{ "%.2f"|format(item.current_yield_pct or 0) }}% x {{ item.current_days }}d = {{ "%.3f"|format(item.current_net_yield_pct) }}% net<br>
+                Series {{ next_series }}: {{ "%.2f"|format(item.next_yield_pct or 0) }}% x {{ item.next_days }}d = {{ "%.3f"|format(item.next_net_yield_pct) }}% net<br>
+                <span class="text-dim">Difference: {{ "%.1f"|format(item.difference_bps) }} bps</span>
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <p class="text-dim">Need bids in both series for comparison.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Recent Alerts -->
+<div class="card">
+    <div class="card-title">Recent Alerts</div>
+    <div class="alert-feed">
+        {% if alerts %}
+        {% for alert in alerts %}
+        <div class="alert-item">
+            <span class="alert-time">{{ alert.alert_time.strftime('%d %b %H:%M') if alert.alert_time else '' }}</span>
+            <span class="badge {{ 'badge-green' if alert.alert_type == 'NEW_BID' else 'badge-blue' if alert.alert_type == 'EOD_SUMMARY' else 'badge-yellow' }}">
+                {{ alert.alert_type }}
+            </span>
+            {% if alert.symbol %}<strong>{{ alert.symbol }}</strong>{% endif %}
+            {% if alert.telegram_sent %}<span class="text-dim">(sent)</span>{% endif %}
+        </div>
+        {% endfor %}
+        {% else %}
+        <p class="text-dim">No alerts yet. Alerts will appear here once the poller runs.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Auto-refresh every 60 seconds
+    setTimeout(() => location.reload(), 60000);
+</script>
+{% endblock %}

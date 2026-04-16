@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% set active_page = "analytics" %}
+
+{% block title %}Analytics — SLBM Tracker{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Analytics</h1>
+
+<!-- Brokerage Refund Tracker -->
+<div class="card">
+    <div class="card-title">Brokerage Refund Tracker</div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Quarter</th>
+                    <th class="text-right">Total Charged</th>
+                    <th class="text-right">Payable (8%)</th>
+                    <th class="text-right">Refund Due</th>
+                    <th class="text-right">Received</th>
+                    <th class="text-right">Outstanding</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in refunds %}
+                <tr>
+                    <td><strong>{{ r.quarter }}</strong></td>
+                    <td class="text-right">{{ "₹{:,.0f}".format(r.total_charged or 0) }}</td>
+                    <td class="text-right">{{ "₹{:,.0f}".format(r.total_payable or 0) }}</td>
+                    <td class="text-right text-yellow">{{ "₹{:,.0f}".format(r.total_refund_due or 0) }}</td>
+                    <td class="text-right text-green">{{ "₹{:,.0f}".format(r.total_refund_received or 0) }}</td>
+                    <td class="text-right text-red">{{ "₹{:,.0f}".format((r.total_refund_due or 0) - (r.total_refund_received or 0)) }}</td>
+                    <td>
+                        <span class="badge {{ 'badge-green' if r.status == 'SETTLED' else 'badge-yellow' if r.status == 'PARTIAL' else 'badge-red' }}">
+                            {{ r.status }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if r.status != 'SETTLED' %}
+                        <button class="btn btn-sm btn-primary" onclick="markReceived('{{ r.quarter }}')">Mark Received</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if not refunds %}
+                <tr><td colspan="8" class="text-dim" style="text-align:center; padding:2rem;">No refund data yet. Refunds are computed from parsed contract notes.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="grid-2">
+    <!-- Monthly Income -->
+    <div class="card">
+        <div class="card-title">Monthly Income</div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Month</th>
+                        <th class="text-right">Txns</th>
+                        <th class="text-right">Gross Income</th>
+                        <th class="text-right">Net Income</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in monthly_income %}
+                    <tr>
+                        <td>{{ m.month }}</td>
+                        <td class="text-right">{{ m.count }}</td>
+                        <td class="text-right">{{ "₹{:,.0f}".format(m.gross or 0) }}</td>
+                        <td class="text-right text-green">{{ "₹{:,.0f}".format(m.net or 0) }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% if not monthly_income %}
+                    <tr><td colspan="4" class="text-dim" style="text-align:center;">No data yet.</td></tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Per-Stock Summary -->
+    <div class="card">
+        <div class="card-title">Per-Stock Summary</div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th class="text-right">Txns</th>
+                        <th class="text-right">Total Gross</th>
+                        <th class="text-right">Total Net</th>
+                        <th class="text-right">Refund Due</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in stock_summary %}
+                    <tr>
+                        <td><strong>{{ s.symbol }}</strong></td>
+                        <td class="text-right">{{ s.txn_count }}</td>
+                        <td class="text-right">{{ "₹{:,.0f}".format(s.total_gross or 0) }}</td>
+                        <td class="text-right text-green">{{ "₹{:,.0f}".format(s.total_net or 0) }}</td>
+                        <td class="text-right text-yellow">{{ "₹{:,.0f}".format(s.total_refund or 0) }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% if not stock_summary %}
+                    <tr><td colspan="5" class="text-dim" style="text-align:center;">No data yet.</td></tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Lending Advisor -->
+<div class="card">
+    <div class="card-title">Lending Advisor — Series {{ current_series }} vs {{ next_series }}</div>
+    {% if advisor_data %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Symbol</th>
+                    <th class="text-right">Current Yield %</th>
+                    <th class="text-right">Current Bid Qty</th>
+                    <th class="text-right">Days Left</th>
+                    <th class="text-right">Net Yield %</th>
+                    <th class="text-right">Next Yield %</th>
+                    <th class="text-right">Next Bid Qty</th>
+                    <th class="text-right">Days Left</th>
+                    <th class="text-right">Net Yield %</th>
+                    <th>Recommendation</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for a in advisor_data %}
+                <tr>
+                    <td><strong>{{ a.symbol }}</strong></td>
+                    <td class="text-right">{{ "%.2f"|format(a.current_yield_pct or 0) }}%</td>
+                    <td class="text-right">{{ "{:,}".format(a.current_bid_qty or 0) }}</td>
+                    <td class="text-right">{{ a.current_days }}d</td>
+                    <td class="text-right {{ 'text-green' if a.recommendation == 'current' else '' }}">{{ "%.3f"|format(a.current_net_yield_pct) }}%</td>
+                    <td class="text-right">{{ "%.2f"|format(a.next_yield_pct or 0) }}%</td>
+                    <td class="text-right">{{ "{:,}".format(a.next_bid_qty or 0) }}</td>
+                    <td class="text-right">{{ a.next_days }}d</td>
+                    <td class="text-right {{ 'text-green' if a.recommendation == 'next' else '' }}">{{ "%.3f"|format(a.next_net_yield_pct) }}%</td>
+                    <td>
+                        <span class="badge {{ 'badge-green' if a.recommendation == 'current' else 'badge-yellow' }}">
+                            {{ a.recommendation|upper }} MONTH
+                        </span>
+                        <span class="text-dim">({{ "%.1f"|format(a.difference_bps) }} bps)</span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-dim">Need active bids in both current and next month series for comparison.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function markReceived(quarter) {
+        const amount = prompt(`Enter refund amount received for ${quarter}:`);
+        if (amount && !isNaN(amount)) {
+            apiCall('/analytics/refund/received', {
+                body: `quarter=${encodeURIComponent(quarter)}&amount=${amount}`,
+                successMsg: `Refund of ₹${Number(amount).toLocaleString()} recorded for ${quarter}`,
+            });
+        }
+    }
+</script>
+{% endblock %}
