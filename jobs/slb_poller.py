@@ -43,9 +43,10 @@ NSE_HEADERS = {
     "Referer": "https://www.nseindia.com/market-data/securities-lending-and-borrowing",
 }
 
-# NSE Market Watch CSV download endpoint.
-# Selecting a series on the SLB page and clicking CSV download hits this URL.
-SLB_MW_CSV_URL = "https://www.nseindia.com/api/snapshot-capital-market-slb"
+# NSE live SLB market watch JSON endpoint.
+# This is what the SLB page itself calls to render the live market watch table.
+# Returns JSON: {"data": [{symbol, buyOrderPrice1, buyOrderQty1, ...}, ...]}
+SLB_MW_CSV_URL = "https://www.nseindia.com/api/live-analysis-slb"
 
 # Fallback: direct archive URL pattern  (MW-SLB-{series}-{dd-Mon-yyyy}.csv)
 SLB_ARCHIVE_URL = (
@@ -57,24 +58,24 @@ SLB_ARCHIVE_URL = (
 # during parsing.  After stripping, the actual column names from the sample
 # file are listed first; legacy/API variants follow.
 COLUMN_MAP = {
-    "symbol":           ["SYMBOL", "Symbol", "symbol"],
-    "best_bid_qty":     ["BEST BID QTY", "Best Bid Qty", "bestBidQty"],
-    "best_bid_price":   ["BEST BID PRICE", "Best Bid Price", "bestBidPrice"],
-    "best_offer_price": ["BEST OFFERS PRICE", "Best Offers Price", "bestOfferPrice"],
-    "best_offer_qty":   ["BEST OFFERS QTY", "Best Offers Qty", "bestOfferQty"],
-    "ltp":              ["LTP", "ltp", "lastPrice", "Last Price"],
-    "underlying_ltp":   ["UNDERLYING LTP", "Underlying LTP", "underlyingValue"],
-    "futures_ltp":      ["FUTURES LTP", "Futures LTP", "futuresLTP"],
-    "spread":           ["SPREAD", "Spread"],
-    "spread_pct":       ["SPREAD (%)", "Spread (%)", "spreadPct"],
-    "open_positions":   ["OPEN POSITIONS", "Open Positions", "openInterest"],
-    "annualised_yield": ["ANNUALISED YIELD (% p.a)", "ANNUALISED YIELD",
+    "symbol":           ["symbol", "SYMBOL", "Symbol"],
+    "best_bid_qty":     ["buyOrderQty1", "BEST BID QTY", "Best Bid Qty", "bestBidQty"],
+    "best_bid_price":   ["buyOrderPrice1", "BEST BID PRICE", "Best Bid Price", "bestBidPrice"],
+    "best_offer_price": ["sellOrderPrice1", "BEST OFFERS PRICE", "Best Offers Price", "bestOfferPrice"],
+    "best_offer_qty":   ["sellQty1", "BEST OFFERS QTY", "Best Offers Qty", "bestOfferQty"],
+    "ltp":              ["lastTradedPrice", "LTP", "ltp", "lastPrice", "Last Price"],
+    "underlying_ltp":   ["underLyingLtp", "UNDERLYING LTP", "Underlying LTP", "underlyingValue"],
+    "futures_ltp":      ["futuresLtp", "FUTURES LTP", "Futures LTP", "futuresLTP"],
+    "spread":           ["spread", "SPREAD", "Spread"],
+    "spread_pct":       ["spreadPer", "SPREAD (%)", "Spread (%)", "spreadPct"],
+    "open_positions":   ["openPositions", "OPEN POSITIONS", "Open Positions", "openInterest"],
+    "annualised_yield": ["annualisedYieldPer", "ANNUALISED YIELD (% p.a)", "ANNUALISED YIELD",
                          "Annualised Yield", "annualisedYield"],
-    "volume":           ["VOLUME", "Volume", "totalTradedQty"],
-    "turnover":         ["TURNOVER (in \u20b9)", "TURNOVER", "Turnover", "turnover"],
-    "transaction_value":["TRANSACTION VALUE (in \u20b9)", "TRANSACTION VALUE",
-                         "Transaction Value", "transactionValue"],
-    "ca":               ["CA", "Ca", "ca", "Corporate Action"],
+    "volume":           ["volume", "VOLUME", "Volume", "totalTradedQty"],
+    "turnover":         ["turnOver", "TURNOVER (in \u20b9)", "TURNOVER", "Turnover", "turnover"],
+    "transaction_value":["transactionValue", "TRANSACTION VALUE (in \u20b9)", "TRANSACTION VALUE",
+                         "Transaction Value"],
+    "ca":               ["caExpDate", "CA", "Ca", "Corporate Action"],
     "allow_recall":     ["AllowRecall", "ALLOWRECALL", "allowRecall"],
     "allow_repay":      ["AllowRepay", "ALLOWREPAY", "allowRepay"],
 }
@@ -246,22 +247,24 @@ def _process_rows(rows: list[dict], series: str, series_type: str,
 
     for row in rows:
         symbol = (_resolve_column(row, "symbol") or "").strip().strip('"').upper()
-        if not symbol or symbol not in portfolio_symbols:
+        if not symbol:
             continue
 
         bid_qty = _safe_int(_resolve_column(row, "best_bid_qty"))
         bid_price = _safe_float(_resolve_column(row, "best_bid_price"))
         annualised = _safe_float(_resolve_column(row, "annualised_yield"))
 
-        # Detect new bid: previous snapshot had no bid, now has one
-        prev = get_previous_snapshot(symbol, series)
-        has_bid = bid_qty is not None and bid_qty > 0
-        had_no_bid = (
-            prev is None
-            or prev.best_bid_qty is None
-            or prev.best_bid_qty == 0
-        )
-        is_new_bid = has_bid and had_no_bid
+        # Detect new bid (only for portfolio symbols — alerts are portfolio-only)
+        is_new_bid = False
+        if symbol in portfolio_symbols:
+            prev = get_previous_snapshot(symbol, series)
+            has_bid = bid_qty is not None and bid_qty > 0
+            had_no_bid = (
+                prev is None
+                or prev.best_bid_qty is None
+                or prev.best_bid_qty == 0
+            )
+            is_new_bid = has_bid and had_no_bid
 
         # NNF protocol flags (may not be in CSV — None if absent)
         allow_recall = _safe_int(_resolve_column(row, "allow_recall"))
@@ -309,10 +312,6 @@ def poll_slb_rates():
     logger.info("Polling SLB rates...")
 
     portfolio_symbols = get_portfolio_symbols()
-    if not portfolio_symbols:
-        logger.info("No portfolio stocks configured, skipping poll")
-        return
-
     current_series, next_series = settings.get_active_series()
     now = datetime.now()
     total_inserted = 0
