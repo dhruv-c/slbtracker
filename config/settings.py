@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from typing import ClassVar
 from pydantic_settings import BaseSettings
 from pydantic import Field
@@ -38,11 +38,22 @@ class Settings(BaseSettings):
     }
 
     def get_active_series(self) -> tuple[str, str]:
+        """Return (current, next) X-series codes.
+
+        X-series for month M expires on the first Tuesday of month M.
+        Once we're at or past that Tuesday, the current calendar month's
+        series is dead and we roll to the next month.
+        """
         if self.current_series and self.next_series:
             return self.current_series, self.next_series
         today = date.today()
-        current = self.X_SERIES_MAP[today.month]
-        next_month = today.month % 12 + 1
+        expiry = self._first_tuesday(today.year, today.month)
+        if today >= expiry:
+            current_month = today.month % 12 + 1
+        else:
+            current_month = today.month
+        next_month = current_month % 12 + 1
+        current = self.X_SERIES_MAP[current_month]
         nxt = self.X_SERIES_MAP[next_month]
         return current, nxt
 
@@ -64,6 +75,28 @@ class Settings(BaseSettings):
         if month_num:
             return f"{series} ({Settings.MONTH_NAMES[month_num]})"
         return series
+
+    @staticmethod
+    def _first_tuesday(year: int, month: int) -> date:
+        """First Tuesday of the given month."""
+        first = date(year, month, 1)
+        # weekday(): Mon=0, Tue=1, ..., Sun=6
+        offset = (1 - first.weekday()) % 7
+        return first + timedelta(days=offset)
+
+    @staticmethod
+    def series_expiry(series: str, reference_date: date | None = None) -> date | None:
+        """First Tuesday of the series' named month.
+        If the series month is earlier than the reference month, assume next year."""
+        if reference_date is None:
+            reference_date = date.today()
+        month = Settings.series_to_month(series)
+        if month == 0:
+            return None
+        year = reference_date.year
+        if month < reference_date.month:
+            year += 1
+        return Settings._first_tuesday(year, month)
 
 
 settings = Settings()

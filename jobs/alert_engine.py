@@ -3,7 +3,6 @@ Alert Engine — evaluates conditions and sends Telegram messages.
 Handles: morning summary, new bid alerts, rate threshold alerts, EOD summary,
 and lending advisor comparisons.
 """
-import calendar
 import logging
 from datetime import datetime, date, timedelta
 
@@ -71,25 +70,11 @@ def log_alert(alert_type: str, message: str, symbol: str = None,
 # ── Lending Advisor ───────────────────────────────────────────────────
 
 def _days_remaining_in_series(series: str) -> int:
-    """Days remaining until series expiry (last Thursday of that month)."""
+    """Days remaining until series expiry (first Tuesday of that series' month)."""
     today = date.today()
-    month = Settings.series_to_month(series)
-    if month == 0:
+    expiry = Settings.series_expiry(series, today)
+    if expiry is None:
         return 30
-    year = today.year
-    if month < today.month:
-        year += 1
-
-    cal = calendar.monthcalendar(year, month)
-    last_thursday = None
-    for week in reversed(cal):
-        if week[3] != 0:
-            last_thursday = week[3]
-            break
-    if last_thursday is None:
-        last_thursday = 28
-
-    expiry = date(year, month, last_thursday)
     return max((expiry - today).days, 1)
 
 
